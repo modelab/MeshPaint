@@ -517,8 +517,7 @@
                         color: invColor,
                         ambient: invColor
                     })
-        // console.log(adjacentVerts[CP].adjPoints);
-        // var aSphere=
+
         for(var w=0;w<adjacentVerts[CP].adjPoints.length;w++){
         	var newSphere=cpSphereGeo.clone();
         	var adjSphereMesh = new THREE.Mesh(new THREE.SphereGeometry(.2, 32, 32) , adjSphereMat);
