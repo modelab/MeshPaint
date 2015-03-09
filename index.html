@@ -612,9 +612,6 @@
             // vector.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1, 0.5);
 
             if (mouse.x != undefined && mouse.y != undefined) {
-                // console.log(mouse.x,mouse.y)
-                // console.log(event.clientX,event.clientY);
-                // vector.set((mouseX / window.innerWidth) * 2 - 1, -(mouseY / window.innerHeight) * 2 + 1, 0.5);
                 vector.set(mouse.x, mouse.y, 0.5).unproject(camera);
                 // vector.unproject(camera);
 
