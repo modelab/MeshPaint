@@ -632,13 +632,6 @@
                 		d3.select("body").style("cursor","none");
 
 
-                    var matSphere = new THREE.MeshPhongMaterial({
-                        side: THREE.DoubleSide,
-                        color: 0x545454,
-                        ambient: 0x000000, // should generally match color
-                        specular: 0x050505,
-                        shininess: 100
-                    })
 
                     POI = (intersects[0].point);
 
@@ -648,22 +641,6 @@
                     displayTopology();
                 }
 
-
-
-                    // console.log(vertAIndex);
-                    // var bary = tri.barycoordFromPoint(intersects[0].point);
-                    // console.log(bary);
-
-
-                    // var sphereGeo = new THREE.SphereGeometry(.6, 32, 32);
-                    // var sphereMesh = new THREE.Mesh(sphereGeo, matSphere);
-
-                    // sphereMesh.position.x = intersects[0].point.x;
-                    // sphereMesh.position.y = intersects[0].point.y;
-                    // sphereMesh.position.z = intersects[0].point.z;
-                    // var crossGroup = new THREE.Object3D();
-                    // crossGroup.add(sphereMesh);
-                    // scene.add(crossGroup)
                 }
                 else{
                 	// d3.select("body").style("cursor","pointer");
