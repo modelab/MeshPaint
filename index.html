@@ -617,7 +617,6 @@
                 raycaster.ray.set(camera.position, vector.sub(camera.position).normalize());
 
                 intersects = raycaster.intersectObject(mesh);
-                // console.log(intersects);
                 if (intersects.length > 0) {
                 	cursorBrush
                 		.attr("cx",remap(mouse.x,-1,1,0,window.innerWidth))
