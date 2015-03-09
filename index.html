@@ -593,7 +593,7 @@
                 var mapToSoftness = remap(mapTo1, 0, brush_size, 0, softness);
                 var mapTo1Inv = remap(mapTo1, 0, 1, 1, 0);
                 var mapToFallofInv = remap(mapTobrush_size, 0, 1, 1, 0);
-                // console.log(dashboard.main_color);
+
                 if (mapTo1 < brush_size) {
                     tempColorA = new THREE.Color(dashboard.main_color[0] / 255, dashboard.main_color[1] / 255, dashboard.main_color[2] / 255);
                     tempColorB = new THREE.Color(dashboard.accent_color[0] / 255, dashboard.accent_color[1] / 255, dashboard.accent_color[2] / 255);
