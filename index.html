@@ -90,8 +90,6 @@
             }
             
             var objExporter = (new THREE.OBJExporter(mesh.geometry));
-            // var objExporter = (new THREE.OBJExporter(uvMesh.geometry));
-//            console.log(allVertexColors);
             var objFile = objExporter.parse(mesh.geometry, allVertexColors);
             var blob = new Blob(["" + objFile + ""], {
                 type: "text/plain;charset=utf-8"
@@ -113,32 +111,6 @@
             adjacentVerts.meshBlur(Math.floor(value));
         });
         var animateBlur = globalFolder.add(dashboard, 'animate_blur');
-        // var crawl = gui.add(dashboard, 'crawl_on_mesh');
-
-     //    crawl.onChange(function (value){
-     //    	if (value==true){
-     //    		// tempSettings["style"]=dashboard.color_style;
-     //    		// tempSettings["wireframe"]=dashboard.wireframe;
-     //    		// tempSettings["blur"]=dashboard.blur;
-
-     //    		// dashboard.wireframe=true;
-     //    		// dashboard.color_style="normalDifference";
-     //    		// dashboard.blur=4;
-     //    		// mesh.material.wireframe=dashboard.wireframe;
-     //    		// mesh.materialNeedsUpdate=true;
-     //    		updateColors();
-     //    	}
-     //    	else{
-     //    		if(topoGroup!=undefined){
-    	// 			scene.remove(topoGroup);
-		   //  		for(r=0;r<topoGroup.children;r++){
-		   //  			topoGroup.children[r].geometry.dispose();
-		   //  			topoGroup.children[r].material.dispose();
-		   //  		}
-    	
-    	// }
-     //    	}
-     //    })
 
         var wireframeBox = globalFolder.add(dashboard, 'wireframe');
         wireframeBox.onChange(function (value){
@@ -148,23 +120,18 @@
 
 
 
-         var colorStyle = gui.add(dashboard, 'basecolor_style', ['x', 'y', 'z', 'normalDifference']);
-         colorStyle.onChange(function(value) {
-             updateColors();
-         })
-//         var colorIndex = gui.add(dashboard, 'color_index', 0, 150);
-//         colorIndex.onChange(function(value) {
-//             updateColors();
-//         })
-
-        
-
-//        var paintBool = globalFolder.add(dashboard, 'paint_on_mesh');
+       
 
         var export_obj = globalFolder.add(dashboard, 'export_obj')
         var brushFolder = gui.addFolder('Brush Palette');
         brushFolder.open();
+        
+          var colorStyle = brushFolder.add(dashboard, 'basecolor_style', ['x', 'y', 'z', 'normalDifference']);
+         colorStyle.onChange(function(value) {
+             updateColors();
+         })
 
+         
         brushFolder.addColor(dashboard, 'main_color');
         brushFolder.addColor(dashboard, 'accent_color');
         brushFolder.add(dashboard, 'accent_weight', 0.000, 1.000);
