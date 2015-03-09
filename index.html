@@ -613,7 +613,6 @@
 
             if (mouse.x != undefined && mouse.y != undefined) {
                 vector.set(mouse.x, mouse.y, 0.5).unproject(camera);
-                // vector.unproject(camera);
 
                 raycaster.ray.set(camera.position, vector.sub(camera.position).normalize());
 
