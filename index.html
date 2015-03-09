@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Bunny Painting</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+    body {
+        font-family: Monospace;
+        background-color: #000;
+        color: #fff;
+        margin: 0px;
+        overflow: hidden;
+        position:absolute;
+    }
+    #info {
+        color: #fff;
+        position: absolute;
+        top: 10px;
+        width: 100%;
+        text-align: center;
+        z-index: 100;
+        display: block;
+    }
+    #info a,
+    .button {
+        color: #f00;
+        font-weight: bold;
+        text-decoration: underline;
+        cursor: pointer
+    }
+    .svgContainer{
+    	/*position:absolute;*/
+    	/*background-color: transparent;*/
+    	position: absolute;
+    	pointer-events: none;
+    }
+    </style>
+</head>
+
+<body>
+    <div id="info">
+    </div>
+
+    <script src="files/js/three-js/three.js"></script>
+    <script src="files/js/three-js/loaders/OBJLoader.js"></script>
+    <script src="files/js/three-js/controls/OrbitControls-mode.js"></script>   
+    <script src="files/js/three-js/modifiers/BoundingBoxHelper.js"></script>
+    <script src="files/js/three-js/exporters/OBJExporter-withColors.js"></script>
+    
+    <script src="files/js/mode-js/mode.js"></script>
+    <script src="files/js/mode-js/plugins/dat.gui-master/build/dat.gui.min.js"></script>
+    <script src="files/js/mode-js/plugins/d3.min.js"></script>
+    <script src="files/js/mode-js/plugins/fileSaver/FileSaver.js"></script>
+    
+    <script>
+
+
+    //////datgui
+
+    //declare Date and Time
+    var date = new Date();
+    var time = date.getTime();
+        
+    var allVertexColors=[];
+    var cursorBrush;
+    var tempSettings={};
+    var dashboard;
+    var raycaster;
+    var mesh;
+    var flag = 0;
+    var line01Geo, line01Mesh;
+    var interface = function() {
+        this.basecolor_style = "y";
+        this.crawl_on_mesh = false;
+        this.main_color = [0, 255, 60];
+        this.accent_color = [0, 255, 255];
+        this.accent_weight = 1;
+        this.blur = 0;
+        this.color_index = 0;
+        this.animate_blur = false;
+        this.paint_on_mesh = true;
+        this.brush_size = 50;
+        this.softness = 1;
+        this.wireframe=false;    
+        this.export_obj = function() {
+            for(var i=0;i<realGeo.vertices.length;i++){
+             allVertexColors.push(adjacentVerts[i].color);   
+            }
+            
+            var objExporter = (new THREE.OBJExporter(mesh.geometry));
+            // var objExporter = (new THREE.OBJExporter(uvMesh.geometry));
+//            console.log(allVertexColors);
+            var objFile = objExporter.parse(mesh.geometry, allVertexColors);
+            var blob = new Blob(["" + objFile + ""], {
+                type: "text/plain;charset=utf-8"
+            });
+            saveAs(blob, "BunnyPaint-" + time + "" + ".obj");
+        }
+    };
+
+    window.onload = function() {
+        dashboard = new interface();
+        var gui = new dat.GUI();
+
+        var globalFolder = gui.addFolder('Global');
+        globalFolder.open();
+
+        var blurSlider = globalFolder.add(dashboard, 'blur', 0, 25).listen();
+
+        blurSlider.onChange(function(value) {
+            adjacentVerts.meshBlur(Math.floor(value));
+        });
+        var animateBlur = globalFolder.add(dashboard, 'animate_blur');
+        // var crawl = gui.add(dashboard, 'crawl_on_mesh');
+
+     //    crawl.onChange(function (value){
+     //    	if (value==true){
+     //    		// tempSettings["style"]=dashboard.color_style;
+     //    		// tempSettings["wireframe"]=dashboard.wireframe;
+     //    		// tempSettings["blur"]=dashboard.blur;
+
+     //    		// dashboard.wireframe=true;
+     //    		// dashboard.color_style="normalDifference";
+     //    		// dashboard.blur=4;
+     //    		// mesh.material.wireframe=dashboard.wireframe;
+     //    		// mesh.materialNeedsUpdate=true;
+     //    		updateColors();
+     //    	}
+     //    	else{
+     //    		if(topoGroup!=undefined){
+    	// 			scene.remove(topoGroup);
+		   //  		for(r=0;r<topoGroup.children;r++){
+		   //  			topoGroup.children[r].geometry.dispose();
+		   //  			topoGroup.children[r].material.dispose();
+		   //  		}
+    	
+    	// }
+     //    	}
+     //    })
+
+        var wireframeBox = globalFolder.add(dashboard, 'wireframe');
+        wireframeBox.onChange(function (value){
+        	mesh.material.wireframe=value;
+        	mesh.materialNeedsUpdate=true;
+        })
+
+
+
+         var colorStyle = gui.add(dashboard, 'basecolor_style', ['x', 'y', 'z', 'normalDifference']);
+         colorStyle.onChange(function(value) {
+             updateColors();
+         })
+//         var colorIndex = gui.add(dashboard, 'color_index', 0, 150);
+//         colorIndex.onChange(function(value) {
+//             updateColors();
+//         })
+
+        
+
+//        var paintBool = globalFolder.add(dashboard, 'paint_on_mesh');
+
+        var export_obj = globalFolder.add(dashboard, 'export_obj')
+        var brushFolder = gui.addFolder('Brush Palette');
+        brushFolder.open();
+
+        brushFolder.addColor(dashboard, 'main_color');
+        brushFolder.addColor(dashboard, 'accent_color');
+        brushFolder.add(dashboard, 'accent_weight', 0.000, 1.000);
+        var brush_size = brushFolder.add(dashboard, 'brush_size', 2, 500.000);
+        var softness = brushFolder.add(dashboard, 'softness', 0.000, 1.000);
+
+
+    };
+
+    //////datgui
+
+    var topoGroup;
+
+
+    var mouse = {
+        x: 1,
+        y: 1
+    };
+
+    var POI;
+    var bbox;
+
+    var container;
+    var newgeom;
+    var camera, scene, renderer;
+
+    var mouseX = 0,
+        mouseY = 0;
+
+    var windowHalfX = window.innerWidth / 2;
+    var windowHalfY = window.innerHeight / 2;
+
+
+    init();
+    animate();
+
+    function updateColors() {
+        var dotList = []
+        for (var i = 0; i < realGeo.vertices.length; i++) {
+            var dotAvg;
+
+            // console.log(bbox);
+            if (dashboard.basecolor_style == "x") {
+                var mapTo1 = remap(adjacentVerts[i].point.x, bbox.min.x, bbox.max.x, 0, 1);
+                var mapTo1Inv = remap(mapTo1, 0, 1, 1, 0);
+                adjacentVerts[i].color = new THREE.Color(mapTo1, mapTo1, mapTo1);
+            }
+            if (dashboard.basecolor_style == "y") {
+                var mapTo1 = remap(adjacentVerts[i].point.y, bbox.min.y, bbox.max.y, 0, 1);
+                var mapTo1Inv = remap(mapTo1, 0, 1, 1, 0);
+                adjacentVerts[i].color = new THREE.Color(mapTo1, mapTo1, mapTo1);
+            }
+            if (dashboard.basecolor_style == "z") {
+                var mapTo1 = remap(adjacentVerts[i].point.z, bbox.min.z, bbox.max.z, 0, 1);
+                var mapTo1Inv = remap(mapTo1, 0, 1, 1, 0);
+                adjacentVerts[i].color = new THREE.Color(mapTo1, mapTo1, mapTo1);
+            }
+//            if (dashboard.color_style == "random") {
+//                adjacentVerts[i].color = new THREE.Color(Math.random(), Math.random(), Math.random());
+//            }
+//            if (dashboard.color_style == "distanceToIndex") {
+//                var sampleVec = adjacentVerts[Math.floor(dashboard.color_index)].point;
+//                var mapTo1 = remap(adjacentVerts[i].point.distanceTo(sampleVec), 0, 100, 0, 1);
+//                var mapTo1Inv = remap(mapTo1, 0, 1, 1, 0);
+//                adjacentVerts[i].color = new THREE.Color(mapTo1, mapTo1Inv, mapTo1);
+//            }
+            if (dashboard.basecolor_style == "normalDifference") {
+                var normVec = (adjacentVerts.normalAtIndex(i))
+                var dots = 0;
+
+                for (var j = 0; j < adjacentVerts.adjNormalsAtIndex(i).length; j++) {
+                    var dotProduct = normVec.normalize().dot(adjacentVerts.adjNormalsAtIndex(i)[j]);
+                    dots += (dotProduct);
+
+                }
+                dotAvg = dots / adjacentVerts.adjNormalsAtIndex(i).length;
+                dotList.push(dotAvg);
+            }
+        }
+        if (dashboard.basecolor_style == "normalDifference") {
+            var dotMin = dotList.slice().sort()[0];
+            var dotMax = dotList.slice().sort().reverse()[0];
+            for (var i = 0; i < realGeo.vertices.length; i++) {
+                var mapTo1 = remap(dotList[i], dotMin, dotMax, 0, 1);
+                var mapTo1Inv = remap(mapTo1, 0, 1, 1, 0);
+                adjacentVerts[i].color = new THREE.Color(mapTo1, mapTo1, mapTo1);
+            }
+        }
+        adjacentVerts.meshBlur(dashboard.blur);
+    }
+
+    function init() {
+
+        container = document.createElement('div');
+        d3.select(container).style("position","absolute")
+        document.body.appendChild(container);
+
+        camera = new THREE.PerspectiveCamera(20, window.innerWidth / window.innerHeight, 1, 2000);
+        camera.position.x=160;
+        camera.position.y=380;
+        camera.position.z=250;
+        // camera.lookAt.x=100;
+        // (40, 280, 153);
+        // camera.look
+
+        raycaster = new THREE.Raycaster();
+        // scene
+
+        scene = new THREE.Scene();
+
+
+        var ambient = new THREE.AmbientLight(0xffffff);
+        scene.add(ambient);
+
+
+        var manager = new THREE.LoadingManager();
+        manager.onProgress = function(item, loaded, total) {
+
+
+
+
+        	   var brushContainer = d3.select("body").append("svg").attr("class","svgContainer").attr("width",window.innerWidth).attr("height", window.innerHeight).append("g");
+   				cursorBrush = brushContainer.append("circle").attr("cx",0).attr("cy",0).attr("r",20)
+   				.style("stroke","white")
+   				// .style("fill","white")
+   				.style("display","none")
+   				.style("stroke-width",2)
+   				.style("fill-opacity",.05)
+   				;
+
+            // console.log( item, loaded, total );
+
+        };
+
+
+        var onProgress = function(xhr) {
+            if (xhr.lengthComputable) {
+                var percentComplete = xhr.loaded / xhr.total * 100;
+                // console.log( Math.round(percentComplete, 2) + '% downloaded' );
+            }
+        };
+
+        var onError = function(xhr) {};
+
+
+
+
+
+        // model
+        // var matz=new THREE.MeshBasicMaterial( { color: 'steelblue', wireframe:false, shading: THREE.SmoothShading, overdraw: false } );
+        // var matz2=new THREE.MeshNormalMaterial( { color: 'steelblue', wireframe:false, shading: THREE.SmoothShading, overdraw: false } );
+        var matz2 =
+            new THREE.MeshPhongMaterial({
+                shading: THREE.SmoothShading,
+                side: THREE.FrontSide,
+                vertexColors: THREE.VertexColors,
+                // wireframe:true,
+                // color: 0x996633,
+                // ambient: 0x996633, // should generally match color
+                specular: 0x050505,
+                shininess: 100
+            });
+        var loader = new THREE.OBJLoader(manager);
+        loader.load('files/obj/bunny.obj', function(object) {
+
+            object.traverse(function(child) {
+                // console.log(object);
+
+                if (child instanceof THREE.Mesh) {
+                    realGeo = (new THREE.Geometry().fromBufferGeometry(child.geometry));
+                    realGeo.mergeVertices();
+                }
+
+
+            });
+            adjacentVerts = new MODE.vertexNeighbors(realGeo);
+//            console.log(adjacentVerts);
+            
+            
+            // console.log(adjacentVerts);
+            realGeo.computeBoundingBox();
+            bbox = realGeo.boundingBox;
+
+            // //random Colors
+            // for (var i = 0; i < realGeo.vertices.length; i++) {
+            //     var mapTo1 = remap(adjacentVerts[i].point.y, bbox.min.y, bbox.max.y, 0, 1);
+            //     var mapTo1Inv = remap(mapTo1, 0, 1, 1, 0);
+            //     adjacentVerts[i].color = new THREE.Color(mapTo1, mapTo1, mapTo1);
+            // }
+            updateColors();
+            // //random Colors
+
+            //circles by Z
+
+
+            // for (var i = 0; i < realGeo.vertices.length; i++) {
+
+            // 	if(dashboard.color_style=="x"){
+            // 		adjacentVerts[i].color = new THREE.Color(remap(adjacentVerts[i].point.x,bbox.min.x,bbox.max.y,0,1), 0, 0);
+            // 	}
+            // 	if(dashboard.color_style=="y"){
+            // 		adjacentVerts[i].color = new THREE.Color(remap(adjacentVerts[i].point.y,bbox.min.y,bbox.max.y,0,1), 0, 0);
+            // 	}
+            // 	if(dashboard.color_style=="z"){
+            // 		adjacentVerts[i].color = new THREE.Color(remap(adjacentVerts[i].point.z,bbox.min.z,bbox.max.y,0,1), 0, 0);
+            // 	}
+            //     if(dashboard.color_style=="random"){
+            //     adjacentVerts[i].color = new THREE.Color(Math.random(), Math.random(), Math.random());
+            // }
+
+            // }
+            //random Colors
+
+
+            // adjacentVerts.setFaceVertexColors();
+
+
+            // console.log(adjacentVerts);
+            // console.log(realGeo);
+            mesh = new THREE.Mesh(realGeo, matz2)
+                // mesh.position.y = -80;
+                // adjacentVerts.meshBlur(0);
+            scene.add(mesh);
+//            console.log(mesh);
+        // MODE.groundReflections(mesh, scene);
+        }, onProgress, onError);
+
+        renderer = new THREE.WebGLRenderer();
+        renderer.setClearColor(0x000000)
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+
+        container.appendChild(renderer.domElement);
+
+
+        controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.damping = 0.2;
+        controls.addEventListener('change', render);
+
+
+        document.addEventListener('mousemove', onDocumentMouseMove, false);
+        document.addEventListener('mousedown', onDocumentMouseDown, false);
+        document.addEventListener('mouseup', onDocumentMouseUp, false);
+        //
+
+        window.addEventListener('resize', onWindowResize, false);
+
+
+    }
+
+    function onWindowResize() {
+
+        windowHalfX = window.innerWidth / 2;
+        windowHalfY = window.innerHeight / 2;
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+    }
+
+    function onDocumentMouseMove(event) {
+
+        // mouseX = (event.clientX - windowHalfX) / 2;
+        // mouseY = (event.clientY - windowHalfY) / 2;
+
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+    }
+
+    //
+    var counter = 0;
+
+    function animate() {
+        controls.update();
+        requestAnimationFrame(animate);
+        render();
+
+        if (dashboard.animate_blur) {
+            // console.log(dashboard)
+            var maxBlur = 25;
+            if (counter < maxBlur * 2) {
+                if (counter < maxBlur) {
+
+                    dashboard.blur = counter;
+                    adjacentVerts.meshBlur(dashboard.blur);
+                } else {
+
+                    dashboard.blur = maxBlur * 2 - counter;
+                    adjacentVerts.meshBlur(dashboard.blur);
+                }
+                counter++;
+            } else {
+                counter = 0;
+            }
+        }
+
+
+    }
+
+    function render() {
+         date = new Date();
+        time = date.getTime();
+
+        //camera.position.x += ( mouseX - camera.position.x ) * .05;
+        //camera.position.y += ( - mouseY - camera.position.y ) * .05;
+
+        // camera.lookAt( scene.position );
+
+        renderer.render(scene, camera);
+        projectToMesh();
+    }
+
+    function onDocumentMouseUp(event) {
+        flag = 0;
+    }
+
+    function onDocumentMouseDown(event) {
+        if (event.which == 2) {
+            flag = 1;
+        }
+        // console.log(mesh.geometry);
+        // console.log(camera.position);
+        // console.log(camera.lookAt);
+        // event.preventDefault();
+
+
+    }
+
+    function displayTopology(){
+    	
+    	if(topoGroup!=undefined){
+    		scene.remove(topoGroup);
+    		for(r=0;r<topoGroup.children;r++){
+    			topoGroup.children[r].geometry.dispose();
+    			topoGroup.children[r].material.dispose();
+    		}
+    	
+    	}
+    	
+		// geometry.dispose();
+		// material.dispose();
+
+    	var distObj={}
+    	var distList = [];
+
+            for (var i = 0; i < realGeo.vertices.length; i++) {
+                distList.push(POI.distanceTo(adjacentVerts[i].point));
+                distObj[""+POI.distanceTo(adjacentVerts[i].point)+""]=i;
+            }
+        var sortObj=Object.keys(distObj).slice().sort();
+        var CP=(distObj[sortObj[0]]);
+        var invColor=new THREE.Color(1-adjacentVerts[CP].color.r,1-adjacentVerts[CP].color.g,1-adjacentVerts[CP].color.b)
+
+    	topoGroup = new THREE.Object3D();
+
+    	line01Geo=new THREE.Geometry();
+       	var materialLine = new THREE.LineDashedMaterial({
+		color: invColor,
+		ambient:invColor,
+		fog:true
+		});
+       	line01Mesh = new THREE.Line(line01Geo,materialLine);
+       	// topoGroup.add(line01Mesh);
+       	
+       	cpSphereGeo = new THREE.SphereGeometry(.3, 32, 32);      
+        var cpSphereMat = new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: invColor,
+                        ambient: invColor
+                        // ambient: 0x000000, // should generally match color
+                        // specular: 0x050505,
+                        // shininess: 100
+                    })
+        cpSphereMesh = new THREE.Mesh(cpSphereGeo, cpSphereMat);
+        // cpSphereMesh.material.color=adjacentVerts[CP].color;
+
+        topoGroup.add(cpSphereMesh);
+        
+
+        var adjSphereMat = new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: invColor,
+                        ambient: invColor
+                    })
+        // console.log(adjacentVerts[CP].adjPoints);
+        // var aSphere=
+        for(var w=0;w<adjacentVerts[CP].adjPoints.length;w++){
+        	var newSphere=cpSphereGeo.clone();
+        	var adjSphereMesh = new THREE.Mesh(new THREE.SphereGeometry(.2, 32, 32) , adjSphereMat);
+        	var neighbor=adjacentVerts[CP].adjIndices[w];
+        	var pt=adjacentVerts.geometry.vertices[neighbor];
+        	adjSphereMesh.position.set(pt.x,pt.y,pt.z)
+        	adjSphereMesh.geometry.verticesNeedUpdate=true;
+        	topoGroup.add(adjSphereMesh);
+
+        	var newLine=line01Geo.clone();
+        	var adjLines=new THREE.Line(newLine,materialLine);
+        	newLine.vertices=[adjacentVerts[CP].point,pt];
+        	newLine.verticesNeedUpdate=true;
+        	// console.log(newLine);
+        	topoGroup.add(adjLines);  
+
+        	var normLine=new THREE.Geometry();
+        	var normLines=new THREE.Line(normLine,materialLine);
+        	normLine.vertices=[adjacentVerts[CP].point,pt];
+        	var ptNorm=pt.clone();
+        	var ptAdd=ptNorm.clone().add(adjacentVerts[neighbor].normal.clone().multiplyScalar(1));
+        	normLine.vertices=[ptNorm,ptAdd];
+        	normLine.verticesNeedUpdate=true;
+        	// topoGroup.add(normLines);  
+        }
+        
+        
+
+
+
+        scene.add(topoGroup)
+
+       cpSphereMesh.position.set(adjacentVerts[CP].point.x,adjacentVerts[CP].point.y,adjacentVerts[CP].point.z)
+       // line01Geo.vertices=[POI,adjacentVerts[CP].point];   
+	
+       	
+
+       	
+
+
+                    
+
+
+
+
+
+
+       
+
+    }
+
+    function paintOnMesh() {
+
+        if (dashboard.paint_on_mesh && flag == 1) {
+            var distList = [];
+
+            for (var i = 0; i < realGeo.vertices.length; i++) {
+                distList.push(POI.distanceTo(adjacentVerts[i].point));
+            }
+            // console.log("")
+            var maxDist = (Math.max.apply(Math, distList));
+            var minDist = (Math.min.apply(Math, distList));
+            // console.log(maxDist,minDist);
+            var brush_size = dashboard.brush_size/500;
+            var softness = dashboard.softness;
+
+            for (var i = 0; i < realGeo.vertices.length; i++) {
+                var mapTo1 = remap(distList[i], minDist, maxDist, 0, 1);
+                var mapTobrush_size = remap(mapTo1, 0, brush_size, 0, dashboard.accent_weight);
+                var mapToSoftness = remap(mapTo1, 0, brush_size, 0, softness);
+                var mapTo1Inv = remap(mapTo1, 0, 1, 1, 0);
+                var mapToFallofInv = remap(mapTobrush_size, 0, 1, 1, 0);
+                // console.log(dashboard.main_color);
+                if (mapTo1 < brush_size) {
+                    tempColorA = new THREE.Color(dashboard.main_color[0] / 255, dashboard.main_color[1] / 255, dashboard.main_color[2] / 255);
+                    tempColorB = new THREE.Color(dashboard.accent_color[0] / 255, dashboard.accent_color[1] / 255, dashboard.accent_color[2] / 255);
+                    tempColor = tempColorA.lerp(tempColorB, mapTobrush_size)
+                    adjacentVerts[i].color = tempColor.lerp(adjacentVerts[i].color, mapToSoftness);
+                }
+            }
+            adjacentVerts.meshBlur(dashboard.blur);
+        }
+    }
+
+    function projectToMesh() {
+        if (mesh != undefined) {
+            var vector = new THREE.Vector3();
+
+            // vector.set((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1, 0.5);
+
+            if (mouse.x != undefined && mouse.y != undefined) {
+                // console.log(mouse.x,mouse.y)
+                // console.log(event.clientX,event.clientY);
+                // vector.set((mouseX / window.innerWidth) * 2 - 1, -(mouseY / window.innerHeight) * 2 + 1, 0.5);
+                vector.set(mouse.x, mouse.y, 0.5).unproject(camera);
+                // vector.unproject(camera);
+
+                raycaster.ray.set(camera.position, vector.sub(camera.position).normalize());
+
+                intersects = raycaster.intersectObject(mesh);
+                // console.log(intersects);
+                if (intersects.length > 0) {
+                	cursorBrush
+                		.attr("cx",remap(mouse.x,-1,1,0,window.innerWidth))
+                		.attr("cy",remap(mouse.y,1,-1,0,window.innerHeight))
+                		.attr("r",dashboard.brush_size)
+                		.style("display","inline")
+                		;
+                		d3.select("body").style("cursor","none");
+
+
+                    var matSphere = new THREE.MeshPhongMaterial({
+                        side: THREE.DoubleSide,
+                        color: 0x545454,
+                        ambient: 0x000000, // should generally match color
+                        specular: 0x050505,
+                        shininess: 100
+                    })
+
+                    POI = (intersects[0].point);
+
+                    paintOnMesh();
+                    if(dashboard.crawl_on_mesh){
+                    	d3.select("body").style("cursor","none");
+                    displayTopology();
+                }
+
+
+
+                    // console.log(vertAIndex);
+                    // var bary = tri.barycoordFromPoint(intersects[0].point);
+                    // console.log(bary);
+
+
+                    // var sphereGeo = new THREE.SphereGeometry(.6, 32, 32);
+                    // var sphereMesh = new THREE.Mesh(sphereGeo, matSphere);
+
+                    // sphereMesh.position.x = intersects[0].point.x;
+                    // sphereMesh.position.y = intersects[0].point.y;
+                    // sphereMesh.position.z = intersects[0].point.z;
+                    // var crossGroup = new THREE.Object3D();
+                    // crossGroup.add(sphereMesh);
+                    // scene.add(crossGroup)
+                }
+                else{
+                	// d3.select("body").style("cursor","pointer");
+                	cursorBrush.style("display","none");
+                	d3.select("body").style("cursor","default");
+                }
+            }
+        }
+    }
+    </script>
+    
+
+
+</body>
+
+</html>
